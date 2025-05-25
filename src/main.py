@@ -1,5 +1,6 @@
-import requests
+import time, requests
 from fastapi import FastAPI, Request
+from fastapi.background import BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 
 from .redis_manager import Order
@@ -19,8 +20,13 @@ def get(pk: str):
     return Order.get(pk=pk) 
 
 
+@app.get('/orders/{pk}')
+def get(pk: str):
+    return Order.get(pk)
+
+
 @app.post('/orders')
-async def create(request: Request):
+async def create(request: Request, background_tasks: BackgroundTasks):
     body = await request.json()
 
     req = requests.get('http://localhost:8000/products/%s' % body['id'])
@@ -36,4 +42,13 @@ async def create(request: Request):
     )
     order.save()
 
+    background_tasks.add_task(order_completed, order)
+
     return order
+
+
+def order_completed(order: Order):
+    time.sleep(5)
+
+    order.status = 'completed'
+    order.save()
